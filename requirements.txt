@@ -1,0 +1,43 @@
+# ============================================================
+# SmartRecruit 项目依赖清单
+# 环境：venv  D:\CodeLearning\Heima\12_基于人力资源RAG简历智能推荐系统\Smartrecruit\.venv
+#       Python 3.13.15
+# 安装：pip install -r requirements.txt
+# 注意：torch 必须带 --index-url 单独装，见下方说明
+# ============================================================
+
+# ---------- 深度学习 / GPU ----------
+# 安装命令（cu128 专用源，修复 RTX 5060 sm_120）：
+#   pip install torch==2.11.0 torchvision --index-url https://download.pytorch.org/whl/cu128
+torch==2.11.0
+torchvision==0.26.0
+
+# ---------- Embedding ----------
+sentence-transformers==6.0.1
+transformers==5.17.0
+FlagEmbedding==1.4.2
+
+# ---------- LangChain (1.x) ----------
+# 注意：langchain-community 官方已标记 sunset（停止积极维护），
+#      新增代码优先用独立集成包；文本切块请从 langchain_text_splitters 导入
+langchain==1.4.0
+langchain-core==1.6.2
+langchain-community==0.4.2
+langchain-openai==1.6.2
+langchain-text-splitters==1.1.2
+openai==3.13.0
+
+# ---------- 存储客户端 ----------
+pymilvus==3.0.1          # 必须配 Milvus 3.0 服务端
+pymongo==4.18.1
+elasticsearch==9.5.1     # 必须配 ES 9 服务端（9.x 客户端不兼容 ES 7/8）
+pymysql==1.2.0
+
+# ---------- Web 界面 ----------
+streamlit==1.63.0
+
+# ---------- 工具 ----------
+loguru==0.7.3
+pydantic==2.13.5
+python-dotenv==1.2.3
+numpy==2.5.2

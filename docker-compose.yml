@@ -1,0 +1,227 @@
+# ============================================================
+# SmartRecruit 四库环境编排
+# 用法：docker compose up -d       启动全部
+#      docker compose ps          查看状态
+#      docker compose down        停止（保留数据）
+#      docker compose down -v     停止并删除数据
+# ============================================================
+# 注意：老的 version: "3.8" 写法已被 Compose V2 废弃，不要写
+# ============================================================
+
+services:
+
+  # ----------------------------------------------------------
+  # 1. MySQL —— 存简历 doc_hash，用于去重判断
+  # ----------------------------------------------------------
+  mysql:
+    image: mysql:8.0
+    container_name: smartrecruit-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: "123456"
+      MYSQL_DATABASE: "smartrecruit"
+      TZ: Asia/Shanghai
+    ports:
+      # 宿主机端口:容器端口，必须加引号，否则 YAML 会当时间解析
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+    healthcheck:
+      # $$ 是为了让 compose 不把它当变量解析，传给容器的是 $MYSQL_ROOT_PASSWORD
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -uroot -p$$MYSQL_ROOT_PASSWORD"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    networks:
+      - smartrecruit
+
+  # ----------------------------------------------------------
+  # 2. MongoDB —— 存简历完整原文（原始档案库）
+  # ----------------------------------------------------------
+  mongodb:
+    image: mongo:5.0
+    container_name: smartrecruit-mongo
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: "root"
+      MONGO_INITDB_ROOT_PASSWORD: "123456"
+      TZ: Asia/Shanghai
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    healthcheck:
+      test: ["CMD-SHELL", "mongo --quiet --eval 'db.adminCommand({ping:1}).ok' -uroot -p123456 --authenticationDatabase admin || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    networks:
+      - smartrecruit
+
+  # ----------------------------------------------------------
+  # 3. Elasticsearch 9 —— 关键词检索（BM25）
+  # 前置条件：WSL2 里需先执行 sysctl -w vm.max_map_count=262144
+  # ----------------------------------------------------------
+  elasticsearch:
+    # 用 Docker Hub 官方镜像（走国内加速器，比 docker.elastic.co 快很多）
+    image: elasticsearch:9.1.0
+    container_name: smartrecruit-es
+    restart: unless-stopped
+    environment:
+      - discovery.type=single-node          # 单节点模式
+      - network.host=0.0.0.0                # ES 9.x 必填，漏了起不来
+      - xpack.security.enabled=false        # 开发环境关鉴权
+      - xpack.security.http.ssl.enabled=false
+      - ES_JAVA_OPTS=-Xms1g -Xmx1g          # 堆内存，两个值要相等
+      - TZ=Asia/Shanghai
+    ports:
+      - "9200:9200"
+    volumes:
+      - es_data:/usr/share/elasticsearch/data
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+      nofile:
+        soft: 65536
+        hard: 65536
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:9200/_cluster/health || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
+    networks:
+      - smartrecruit
+
+  # ----------------------------------------------------------
+  # 4. etcd —— Milvus 的元数据存储（存 Collection/索引结构）
+  # ----------------------------------------------------------
+  etcd:
+    image: quay.io/coreos/etcd:v3.5.16
+    container_name: smartrecruit-etcd
+    restart: unless-stopped
+    environment:
+      - ETCD_AUTO_COMPACTION_MODE=revision
+      - ETCD_AUTO_COMPACTION_RETENTION=1000
+      - ETCD_QUOTA_BACKEND_BYTES=4294967296
+      - ETCD_SNAPSHOT_COUNT=50000
+    # 不需要对外暴露端口，容器内网通信即可
+    volumes:
+      - etcd_data:/etcd
+    command:
+      - etcd
+      - --advertise-client-urls=http://127.0.0.1:2379
+      - --listen-client-urls=http://0.0.0.0:2379
+      - --data-dir=/etcd
+    healthcheck:
+      test: ["CMD", "etcdctl", "endpoint", "health"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+    networks:
+      - smartrecruit
+
+  # ----------------------------------------------------------
+  # 5. MinIO —— Milvus 的对象存储（真正存向量和索引文件）
+  # ----------------------------------------------------------
+  minio:
+    image: minio/minio:RELEASE.2024-05-28T17-19-04Z
+    container_name: smartrecruit-minio
+    restart: unless-stopped
+    environment:
+      MINIO_ROOT_USER: "minioadmin"
+      MINIO_ROOT_PASSWORD: "minioadmin"
+      MINIO_ACCESS_KEY: "minioadmin"
+      MINIO_SECRET_KEY: "minioadmin"
+    ports:
+      - "9000:9000"    # S3 API
+      - "9001:9001"    # 控制台 Web UI
+    volumes:
+      - minio_data:/minio_data
+    command: minio server /minio_data --console-address ":9001"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:9000/minio/health/live || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+    networks:
+      - smartrecruit
+
+  # ----------------------------------------------------------
+  # 6. Milvus 3.0 standalone —— 向量数据库（语义召回）
+  # v3.0 已改用内嵌 Woodpecker，不再需要 Pulsar 容器
+  # ----------------------------------------------------------
+  milvus:
+    image: milvusdb/milvus:v3.0.0
+    container_name: smartrecruit-milvus
+    restart: unless-stopped
+    command: ["milvus", "run", "standalone"]
+    security_opt:
+      - seccomp:unconfined
+    environment:
+      ETCD_ENDPOINTS: etcd:2379
+      MINIO_ADDRESS: minio:9000
+      MINIO_ACCESS_KEY_ID: minioadmin
+      MINIO_SECRET_ACCESS_KEY: minioadmin
+    ports:
+      - "19530:19530"   # gRPC 客户端端口
+      - "9091:9091"     # WebUI / metrics
+    volumes:
+      - milvus_data:/var/lib/milvus
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9091/healthz"]
+      interval: 15s
+      timeout: 10s
+      retries: 15
+      start_period: 90s
+    depends_on:
+      etcd:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    networks:
+      - smartrecruit
+
+  # ----------------------------------------------------------
+  # 7. Attu —— Milvus 可视化界面
+  # ----------------------------------------------------------
+  attu:
+    image: zilliz/attu:v3.0
+    container_name: smartrecruit-attu
+    restart: unless-stopped
+    environment:
+      MILVUS_URL: milvus:19530
+    ports:
+      # 容器内是 3000，不是 8000
+      - "8000:3000"
+    depends_on:
+      milvus:
+        condition: service_healthy
+    networks:
+      - smartrecruit
+
+# ============================================================
+# 数据卷声明 —— 不声明的话 docker compose down 会丢数据
+# ============================================================
+volumes:
+  mysql_data:
+  mongo_data:
+  es_data:
+  etcd_data:
+  minio_data:
+  milvus_data:
+
+# ============================================================
+# 自定义网络 —— 让容器之间能通过服务名互相访问
+# ============================================================
+networks:
+  smartrecruit:
+    driver: bridge
