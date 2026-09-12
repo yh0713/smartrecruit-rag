@@ -7,7 +7,7 @@ from langchain_core.output_parsers import JsonOutputParser
 load_dotenv(find_dotenv())
 
 def build_llm()->ChatOpenAI:
-    return ChatOpenAI(model=os.getenv("LLM_MODEL","qwen-plus"),
+    return ChatOpenAI(model=os.getenv("LLM_MODEL","deepseek-v4-flash-0731"),
                       api_key=os.getenv("LLM_API_KEY"),
                       base_url=os.getenv("LLM_BASE_URL"),
                       temperature=float(os.getenv("LLM_TEMPERATURE",0.1)),)
