@@ -1,4 +1,4 @@
-﻿import os
+import os
 from collections import Counter
 
 from langchain_community.document_loaders import PyPDFLoader
