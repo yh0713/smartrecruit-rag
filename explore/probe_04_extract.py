@@ -8,11 +8,11 @@ from typing import Annotated, Literal
 from dotenv import load_dotenv, find_dotenv
 
 # ⚠️ 警告过滤器必须在 import 之前装好。
-# 放到 import 之后，test_splitter 导入时发出的 DeprecationWarning
+# 放到 import 之后，probe_03_split 导入时发出的 DeprecationWarning
 # 已经被默认过滤器丢掉，simplefilter 就白设了。
 warnings.simplefilter("always", DeprecationWarning)
 
-from test_splitter import load_pdf  # noqa: E402
+from probe_03_split import load_pdf  # noqa: E402
 from langchain_openai import ChatOpenAI  # noqa: E402
 from pydantic import BaseModel, ConfigDict, Field, field_validator  # noqa: E402
 

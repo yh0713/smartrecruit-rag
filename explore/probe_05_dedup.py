@@ -21,9 +21,10 @@ from dataclasses import dataclass, field
 from difflib import SequenceMatcher
 from pathlib import Path
 
-from test_splitter import load_pdf
+from probe_03_split import load_pdf
 
-CODE_DIR = Path(__file__).resolve().parent           # Smartrecruit\
+EXPLORE_DIR = Path(__file__).resolve().parent        # Smartrecruit\explore
+CODE_DIR = EXPLORE_DIR.parent                        # Smartrecruit\
 PROJECT_ROOT = CODE_DIR.parent                       # 项目根（放测试 PDF 的地方）
 DATA_DIR = CODE_DIR / "data"                         # 已进 .gitignore，运行时产物都放这
 REGISTRY_PATH = DATA_DIR / "hash_registry.json"
