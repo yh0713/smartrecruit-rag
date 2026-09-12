@@ -33,8 +33,14 @@ pymongo==4.18.1
 elasticsearch==9.5.1     # 必须配 ES 9 服务端（9.x 客户端不兼容 ES 7/8）
 pymysql==1.2.0
 
+# ---------- PDF 解析 ----------
+pypdf==6.18.1            # PyPDFLoader 的底层依赖，漏装会 ImportError
+
 # ---------- Web 界面 ----------
 streamlit==1.63.0
+
+# ---------- 测试 ----------
+pytest==8.4.2
 
 # ---------- 工具 ----------
 loguru==0.7.3
