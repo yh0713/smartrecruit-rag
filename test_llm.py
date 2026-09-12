@@ -14,7 +14,7 @@ def build_llm()->ChatOpenAI:
     api_key=os.getenv("LLM_API_KEY")
     if not api_key:
         raise Exception("没有找到LLM_API_KEY,检查.env是否在项目根目录")
-    return ChatOpenAI(model=os.getenv("LLM_MODEL","qwen-plus"),api_key=api_key,base_url=os.getenv("LLM_BASE_URL"),
+    return ChatOpenAI(model=os.getenv("LLM_MODEL","deepseek-v4-flash-0731"),api_key=api_key,base_url=os.getenv("LLM_BASE_URL"),
                       temperature=float(os.getenv("LLM_TEMPERATURE",0.1)),timeout=30)
 
 def main():
