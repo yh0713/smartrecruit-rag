@@ -1,0 +1,15 @@
+# Streamlit 主题：深色科技风
+# base="dark" 让内置控件（下拉、滑块、上传器）也走深色，避免我们自己写的卡片与控件风格撕裂
+[theme]
+base = "dark"
+primaryColor = "#22D3EE"
+backgroundColor = "#0A0E14"
+secondaryBackgroundColor = "#121A26"
+textColor = "#E6EDF3"
+font = "sans serif"
+
+[server]
+headless = true
+
+[browser]
+gatherUsageStats = false
